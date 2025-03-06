@@ -1,3 +1,3 @@
-  conda create --name contrib python=3.10
+    conda create --name contrib python=3.10
   
-  conda activate contrib
+conda activate contrib
