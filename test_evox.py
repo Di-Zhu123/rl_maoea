@@ -69,7 +69,7 @@ def test_evox(env, problem_name, dim, model, n_generations=100, n_runs=10, rewar
 
         # start_time = time.time()
         for i in range(n_generations):
-            if i % 200 == 0:
+            if i % 1000 == 0:
                 print(i, '/', n_generations)
             if i == n_generations - 1:
                 vec_env = model.get_env()

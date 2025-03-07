@@ -161,25 +161,28 @@ class RVEA(Algorithm):
 
 
 def replace_nan_rows(survivor, survivor_fit, merge_pop, merge_fit):
+    k=100
+    while k!=0:
+        
     # 检测survivor或survivor_fit中存在NaN的行
-    nan_mask = torch.any(torch.isnan(survivor), dim=1) | torch.any(torch.isnan(survivor_fit), dim=1)
-    k = nan_mask.sum().item()
+        nan_mask = torch.any(torch.isnan(survivor), dim=1) | torch.any(torch.isnan(survivor_fit), dim=1)
+        k = nan_mask.sum().item()
     
-    if k == 0:
-        return survivor, survivor_fit  # 无NaN行需要替换
-    
-    # 确保merge池足够大
-    assert merge_pop.size(0) >= k, f"merge_pop需要至少{k}行，当前只有{merge_pop.size(0)}行"
-    
-    # 随机选择k个替换行（允许重复选择）
-    indices = torch.randint(merge_pop.size(0), (k,))
-    
-    # 克隆原始张量避免修改原始数据
-    survivor = survivor.clone()
-    survivor_fit = survivor_fit.clone()
-    
-    # 执行替换
-    survivor[nan_mask] = merge_pop[indices]
-    survivor_fit[nan_mask] = merge_fit[indices]
+        if k == 0:
+            return survivor, survivor_fit  # 无NaN行需要替换
+        
+        # 确保merge池足够大
+        assert merge_pop.size(0) >= k, f"merge_pop需要至少{k}行，当前只有{merge_pop.size(0)}行"
+        
+        # 随机选择k个替换行（允许重复选择）
+        indices = torch.randint(merge_pop.size(0), (k,))
+        
+        # 克隆原始张量避免修改原始数据
+        survivor = survivor.clone()
+        survivor_fit = survivor_fit.clone()
+        
+        # 执行替换
+        survivor[nan_mask] = merge_pop[indices]
+        survivor_fit[nan_mask] = merge_fit[indices]
     
     return survivor, survivor_fit
