@@ -181,7 +181,7 @@ class EvoXContiEnv(gym.Env):
         if self.indicator_last == -1:
             return 0.0
         # 限制奖励范围
-        print(reward.item())
+        # print(reward.item())
         reward = np.clip(reward, -0.1, 1)
         return reward
 
@@ -221,9 +221,9 @@ if __name__ == '__main__':
     save_path = "ppo_"+ reward_mode[0:4]+"_"+problem+"_d"+str(dim)+"_g"+to_sci_string(n_generations)+"_ns"+str(n_steps)+'_'+to_sci_string(int(total_timesteps))+'_'+date
 
     env = EvoXContiEnv(problem, dim,  n_generations=n_generations, pop_size=pop_size, reward_mode =reward_mode)
-    # policy_kwargs = dict(net_arch=[dict(pi=[128, 128], vf=[128, 128])])
-    # model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./mlp_tensorboard/", n_steps=n_steps, policy_kwargs=policy_kwargs) 
-    model = PPO("MlpPolicy", env, verbose=0, tensorboard_log="./mlp_tensorboard/", n_steps=n_steps) 
+    policy_kwargs = dict(net_arch=[dict(pi=[128, 128], vf=[128, 128])])
+    model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./mlp_tensorboard/", n_steps=n_steps, policy_kwargs=policy_kwargs) 
+    # model = PPO("MlpPolicy", env, verbose=0, tensorboard_log="./mlp_tensorboard/", n_steps=n_steps) 
 
     avg_hvs =[]
     avg_igds = []
