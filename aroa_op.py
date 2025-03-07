@@ -2,7 +2,7 @@ import torch
 from scipy.spatial.distance import pdist, squareform
 from pymoo.core.population import Population
 
-def aroaop(pop, t, maxEvals, action, ub, lb):
+def aroaop(pop, t, maxEvals, action, ub, lb, mode='pymoo'):
 
     """
     Generate a new population using the AROA operator for one generation.
@@ -25,20 +25,27 @@ def aroaop(pop, t, maxEvals, action, ub, lb):
     tr1 = torch.tensor(0.9)   # Threshold 1 for random perturbation
     tr2 = torch.tensor(0.85)  # Threshold 2 for trigonometric perturbation
     tr3 = torch.tensor(0.9)   # Threshold 3 for uniform perturbation
+    
 
+    
+    
     # Extract decision variables from population
-    X = torch.tensor(pop.get("X"), dtype=torch.float32)
+    if mode == 'pymoo':
+        X = torch.tensor(pop.get("X"), dtype=torch.float32)
+    elif mode == 'evox':
+        X = pop
     N, dim = X.shape  # N: population size, dim: problem维度
 
     # Convert action to tensor
     action = torch.tensor(action, dtype=torch.float32)
 
+    
     # Calculate maximum iterations (for scaling purposes)
     tmax = int(torch.ceil(torch.tensor((maxEvals - N) / (2 * N))))
     if tmax < 1:
         tmax = 1
     # added in 2.28
-    if t/tmax>=1:
+    if t>=tmax:
         tmax = t
 
     # Compute distance matrix
@@ -51,7 +58,7 @@ def aroaop(pop, t, maxEvals, action, ub, lb):
     # Update each individual
     for i in range(N):
         Dimax = torch.max(D[i, :])  # Maximum distance for individual i
-        k = int(torch.floor(torch.tensor((1 - t/tmax) * N))) + 1  # Number of neighbors
+        # k = int(torch.floor(torch.tensor((1 - t/tmax) * N))) + 1  # Number of neighbors
         
         k=2
         
@@ -62,7 +69,7 @@ def aroaop(pop, t, maxEvals, action, ub, lb):
         for j in neighbors[:k]:
             I = 1 - (D[i, j] / Dimax)  # Distance-based influence
             s = torch.sign(action[j] - action[i])  # Direction based on action
-            if np.abs(action[j] - action[i])<0.001:
+            if torch.abs(action[j] - action[i])<0.001:
                 s=0
             delta_ni += c * (X[i, :] - X[j, :]) * I * s
         ni = delta_ni / k
@@ -97,10 +104,15 @@ def aroaop(pop, t, maxEvals, action, ub, lb):
 
         # Update individual position
         X[i, :] += ni[0, :] + bi + ri
-        X[i, :]  = torch.clamp(X[i, :] , min=torch.from_numpy(lb), max=torch.from_numpy(ub))
+        if mode == 'pymoo':
+            X[i, :]  = torch.clamp(X[i, :] , min=torch.from_numpy(lb), max=torch.from_numpy(ub))
+        elif mode == 'evox':
+            X[i, :] = torch.clamp(X[i, :], min=lb, max=ub)
     # Create new population with updated positions
-    off = Population.new("X", X.numpy())
-
+    if mode=='pymoo':
+        off = Population.new("X", X.numpy())
+    elif mode=='evox':
+        off = X
     return off
 
 # Helper functions
@@ -124,11 +136,12 @@ def roulette_wheel_selection(weights):
             return idx
     return len(weights) - 1
 
-from pymoo.core.population import Population
-import numpy as np
 
 
 if __name__ == "__main__":
+    from pymoo.core.population import Population
+    import numpy as np
+
     # Example setup
     N = 40
     dim = 100

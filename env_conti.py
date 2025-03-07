@@ -30,13 +30,19 @@ class conti_env(gym.Env):
 
         # self.action_space = spaces.MultiDiscrete([pop_size] * pop_size)
         self.action_space = spaces.Box(low=0, high=1, shape=(pop_size, ))
-        self.observation_space = spaces.Box(low=0, high=100, shape=(pop_size, dim))
+        self.observation_space = spaces.Box(low=0, high=4, shape=(pop_size, dim))
         self.state = None
         self.reward_mode = reward_mode
         self.w1 = 10
         # self.ref_dirs = get_reference_directions("das-dennis", self.dim, n_partitions=self.pop_size-1)
-        self.ref_dirs = get_reference_directions("das-dennis", self.dim, n_points=self.pop_size)
-        self.ref_dirs_pf = get_reference_directions("das-dennis", self.dim, n_points=self.pop_size*10)
+        if self.dim == 2:
+            self.n_partitions = self.pop_size-1
+        if self.dim == 5:
+            if self.pop_size == 91:
+                self.n_partitions = 4
+                # Either choose n_points = 70 (n_partitions = 4) or n_points = 126 (n_partitions = 5).
+        self.ref_dirs = get_reference_directions("das-dennis", self.dim, n_partitions=self.n_partitions)
+        self.ref_dirs_pf = get_reference_directions("das-dennis", self.dim, n_partitions=self.n_partitions+3)
         self.algorithm = RVEA(ref_dirs = self.ref_dirs, pop_size=self.pop_size, n_offsprings=self.pop_size, n_generations=self.n_generations)
         self.reset()
     
@@ -106,8 +112,8 @@ class conti_env(gym.Env):
                 indicator_now = hv_pymoo + self.w1*igd_pymoo
                 reward = (indicator_now - self.indicator_last)/ np.abs(self.indicator_last)
                 self.indicator_last = indicator_now
-        if reward > 1:
-            reward = 1
+        if reward > 2:
+            reward = 2
         elif reward < -0.1:
             reward = -0.1
         if self.indicator_last == -1:
@@ -191,8 +197,8 @@ if __name__ == '__main__':
     reward_mode = 'igdhv'
 
     problem = 'dtlz2'
-    dim = 5
-    n_generations = 10000
+    dim = 2
+    n_generations = 5000
     n_steps = 10
     total_timesteps = 4e4
 
@@ -203,18 +209,23 @@ if __name__ == '__main__':
     save_path = "ppo_"+ reward_mode[0:4]+"_"+problem+"_d"+str(dim)+"_g"+to_sci_string(n_generations)+"_ns"+str(n_steps)+'_'+to_sci_string(int(total_timesteps))+'_'+date
 
     env = conti_env(problem, dim,  n_generations=n_generations, repetitions=1, pop_size=91, step_times=10, reward_mode =reward_mode)
-    policy_kwargs = dict(net_arch=[dict(pi=[128, 128], vf=[128, 128])])
-    model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./mlp_tensorboard/", n_steps=n_steps, policy_kwargs=policy_kwargs) 
+    # policy_kwargs = dict(net_arch=[dict(pi=[128, 128], vf=[128, 128])])
+    # model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./mlp_tensorboard/", n_steps=n_steps, policy_kwargs=policy_kwargs) 
+    model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./mlp_tensorboard/", n_steps=n_steps) 
 
+    avg_hvs =[]
+    avg_igds = []
+    hv_tolence = 0.003
+    igd_tolence = 0.003
     for i in range(N_test):
     # for i in [0,1]:
         # i=0
-        # test_step = 20
+        test_step = 20
         model.learn(total_timesteps=test_step, tb_log_name=str(i)+save_path, log_interval=1, reset_num_timesteps=False)
         model.save(str(i)+save_path)
         vec_env = model.get_env()
         # vec_env = RecurrentPPO.load(str(i)+save_path)
-        avg_hv, std_hv, avg_igd, std_igd = test_contrib(vec_env, problem, dim, model, n_episodes=5, reward_mode='igdhv', n_generations=n_generations)
+        avg_hv, std_hv, avg_igd, std_igd = test_contrib(vec_env, problem, dim, model, n_episodes=3, reward_mode='igdhv', n_generations=n_generations)
         # print('avg_hv', avg_hv, 'std_hv', std_hv, 'avg_igd', avg_igd, 'std_igd', std_igd)
         with open("metric_log/metric_ppo.txt", "a") as file:
             file.write(str(i)+save_path)
@@ -222,6 +233,12 @@ if __name__ == '__main__':
             file.write(f"std_hv: {std_hv}")
             file.write(f"avg_igd: {avg_igd}")
             file.write(f"std_igd: {std_igd}\n")
+        if len(avg_hvs) > 0:
+            if np.abs(avg_hv-avg_hvs[-1])<hv_tolence and np.abs(avg_igd-avg_igds[-1])<igd_tolence:
+                print('hv and igd converge')
+                break
+        avg_hvs.append(avg_hv)
+        avg_igds.append(avg_igd)
     
     
     

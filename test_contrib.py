@@ -36,7 +36,11 @@ def test_contrib(env, problem, dim, model, n_episodes=10, reward_mode='hv_Percen
         
         obs = env.reset()
         done = [False]
-        pf = get_problem(problem, n_var=2 * dim, n_obj=dim).pareto_front()
+        k=5
+        
+        vec_env = model.get_env()
+        ref_dirs_pf = vec_env.envs[0].unwrapped.gym_env.ref_dirs_pf
+        pf = get_problem(problem, n_var=dim+k-1, n_obj=dim).pareto_front(ref_dirs_pf)
         # while not done[0]:
         for i in range(n_generations):
             # here to save the final result
@@ -55,6 +59,7 @@ def test_contrib(env, problem, dim, model, n_episodes=10, reward_mode='hv_Percen
                 igd = IGD(pf)(front)
 
             action, _ = model.predict(obs, deterministic=True)
+            #(1,91)
             obs, _, done, _ = env.step(action)
             # print(f"Gen: {env.envs[0].current_gen}, HV: {env.envs[0].indicator_last}")
         print('episode',episode,'igd',igd,'hv',final_hv)
@@ -93,13 +98,14 @@ def test_contrib(env, problem, dim, model, n_episodes=10, reward_mode='hv_Percen
 if __name__ == "__main__":
     from env_conti import conti_env
     # 测试参数设置
-    PROBLEM = 'dtlz2'
+    PROBLEM = 'dtlz3'
     DIM = 2
     MODEL_PATH = "ppo_mlp_model_hv_percentage"  # 根据实际保存的模型路径修改
     MODEL_PATH = "conti_ppo_hv_Percentage_dtlz2_d2_gen500_nstep20"
+    MODEL_PATH = "/home/zhu_di/workspace/rl_maoea/19ppo_igdh_dtlz2_d2_g2e3_ns10_4e4_0304"
     N_EPISODES = 2
     n_generations = 2000
-    reward_mode = 'hv_Percentage'
+    reward_mode = 'igdhv'
     env = conti_env(problem=PROBLEM, 
                 dim=DIM, 
                 n_generations=n_generations, 
