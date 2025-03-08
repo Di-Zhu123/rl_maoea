@@ -8,6 +8,7 @@
     pip install scikit-learn -i https://pypi.tuna.tsinghua.edu.cn/simple
     pip install shimmy>=2.0 -i https://pypi.tuna.tsinghua.edu.cn/simple
     pip install tensorboard -i https://pypi.tuna.tsinghua.edu.cn/simple
+    pip install sbx-rl -i https://pypi.tuna.tsinghua.edu.cn/simple
     
 Note:    
 Stable-Baselines3 requires python 3.9+ and PyTorch >= 2.3

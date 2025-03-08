@@ -3,6 +3,7 @@ from gym import spaces
 import numpy as np
 import torch
 from evox.problems.numerical import DTLZ1, DTLZ2, DTLZ3, DTLZ4, DTLZ5, DTLZ6, DTLZ7
+from maf import MaF1, MaF2, MaF3, MaF4, MaF5, MaF6, MaF7
 from rvea_evox import RVEA
 from evox.workflows import StdWorkflow, EvalMonitor
 from evox.metrics import hv, igd
@@ -52,7 +53,14 @@ class EvoXContiEnv(gym.Env):
             'dtlz4': DTLZ4,
             'dtlz5': DTLZ5,
             'dtlz6': DTLZ6,
-            'dtlz7': DTLZ7
+            'dtlz7': DTLZ7,
+            # 'maf1': MaF1,
+            # 'maf2': MaF2,
+            # 'maf3': MaF3,
+            # 'maf4': MaF4,
+            # 'maf5': MaF5,
+            # 'maf6': MaF6,
+            # 'maf7': MaF7
         }
 
     def _setup_problem(self):
@@ -202,13 +210,14 @@ if __name__ == '__main__':
     warnings.filterwarnings("ignore", category=UserWarning, message="To copy construct from a tensor*")
     warnings.filterwarnings('ignore', category=DeprecationWarning)
 
-    date = '0307'
+    date = '0308'
     # reward_mode = 'hv_Percentage'
     # reward_mode = 'ibea'
     # reward_mode = 'igdhv'
     reward_mode = 'log_smooth' # 1.8251, 0.0142, 0.0361, 0.0119, 0.0022, -0.0050, -0.0456, 0.0001, 0.0034, 0.0099, -0.0119, 0.0292, 0.0468, 0.0142, -0.0059, 0.0062, 0.0326, 0.0018, -0.0120, 0.0156, -0.0277, -0.0069, 0.0032, -0.0166, 0.0130, 0.0137
     pop_size = 85
-    problem = 'dtlz2'
+    # problem = 'dtlz2'
+    problem = 'maf2'
     dim = 5
     n_generations = 5000
     n_steps = 20
@@ -224,7 +233,7 @@ if __name__ == '__main__':
     policy_kwargs = dict(net_arch=[dict(pi=[128, 128], vf=[128, 128])])
     model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./mlp_tensorboard/", n_steps=n_steps, policy_kwargs=policy_kwargs) 
     # model = PPO("MlpPolicy", env, verbose=0, tensorboard_log="./mlp_tensorboard/", n_steps=n_steps) 
-
+    # model = PPO.load("/home/zhu_di/workspace/rl_maoea/models/0ppo_log__all_d5_g5e3_ns20_4e5_0308.zip", env=env) 
     avg_hvs =[]
     avg_igds = []
     hv_tolence = 0.003
@@ -232,24 +241,24 @@ if __name__ == '__main__':
     for i in range(N_test):
     # for i in [0,1]:
         # i=0
-        # test_step = 200
-        model.learn(total_timesteps=test_step, tb_log_name=str(i)+save_path, log_interval=1, reset_num_timesteps=False)
+        test_step = 200
+        model.learn(total_timesteps=test_step, tb_log_name=str(i+1)+save_path, log_interval=1, reset_num_timesteps=False)
         model.save("models/"+str(i)+save_path)
-        vec_env = model.get_env()
-        # vec_env = RecurrentPPO.load(str(i)+save_path)
-        # print(vec_env.unwrapped.envs[0].rewards)
+        # vec_env = model.get_env()
+        # # vec_env = RecurrentPPO.load(str(i)+save_path)
+        # # print(vec_env.unwrapped.envs[0].rewards)
         # print(i)
-        avg_hv, std_hv, avg_igd, std_igd = test_evox(vec_env, problem, dim, model, n_generations=n_generations, n_runs=5, reward_mode='igdhv')
-        print('avg_hv', avg_hv, 'std_hv', std_hv, 'avg_igd', avg_igd, 'std_igd', std_igd)
-        with open("metric_log/metric_ppo.txt", "a") as file:
-            file.write(str(i)+save_path)
-            file.write(f"avg_hv: {avg_hv}")
-            file.write(f"std_hv: {std_hv}")
-            file.write(f"avg_igd: {avg_igd}")
-            file.write(f"std_igd: {std_igd}\n")
-        if len(avg_hvs) > 0:
-            if np.abs(avg_hv-avg_hvs[-1])<hv_tolence and np.abs(avg_igd-avg_igds[-1])<igd_tolence:
-                print('hv and igd converge')
-                break
-        avg_hvs.append(avg_hv)
-        avg_igds.append(avg_igd)
+        # avg_hv, std_hv, avg_igd, std_igd = test_evox(vec_env, problem, dim, model, n_generations=n_generations, n_runs=5, reward_mode='igdhv')
+        # print('avg_hv', avg_hv, 'std_hv', std_hv, 'avg_igd', avg_igd, 'std_igd', std_igd)
+        # with open("metric_log/metric_ppo.txt", "a") as file:
+        #     file.write(str(i)+save_path)
+        #     file.write(f"avg_hv: {avg_hv}")
+        #     file.write(f"std_hv: {std_hv}")
+        #     file.write(f"avg_igd: {avg_igd}")
+        #     file.write(f"std_igd: {std_igd}\n")
+        # if len(avg_hvs) > 0:
+        #     if np.abs(avg_hv-avg_hvs[-1])<hv_tolence and np.abs(avg_igd-avg_igds[-1])<igd_tolence:
+        #         print('hv and igd converge')
+        #         break
+        # avg_hvs.append(avg_hv)
+        # avg_igds.append(avg_igd)
