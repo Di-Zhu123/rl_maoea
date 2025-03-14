@@ -10,6 +10,20 @@ from evox.metrics import hv, igd
 from stable_baselines3 import PPO
 from test_evox import test_evox
 import random
+from hv_norm import hv_normalized
+
+
+def reg_evox():
+    # 确保环境已注册
+    try:
+        gym.make('env_evox-v1')
+    except:
+        from gym.envs.registration import register
+        register(
+            id='env_evox-v1',
+            entry_point='env_evox:EvoXContiEnv',
+        )
+
 
 def to_sci_string(number):
     """
@@ -44,7 +58,9 @@ class EvoXContiEnv(gym.Env):
         self.action_space = spaces.Box(low=0, high=1, shape=(pop_size,), dtype=np.float32)
         
         # 观察空间：适应度值矩阵
-        self.observation_space = spaces.Box(low=0, high=4, shape=(pop_size, dim), dtype=np.float32)
+        # self.observation_space = spaces.Box(low=0, high=1, shape=(pop_size, dim), dtype=np.float32)
+        self.observation_space = spaces.Box(low=0, high=1, shape=(pop_size*dim, ), dtype=np.float32)
+        # self.observation_space = spaces.Box(low=0, high=4, shape=(pop_size, dim), dtype=np.float32)
         
         self.problem_class_map = {
             'dtlz1': DTLZ1,
@@ -62,6 +78,7 @@ class EvoXContiEnv(gym.Env):
             # 'maf6': MaF6,
             # 'maf7': MaF7
         }
+        
 
     def _setup_problem(self):
         problem_name = self.problem
@@ -111,11 +128,11 @@ class EvoXContiEnv(gym.Env):
         self.rewards = []
         self.front = None
         # 初始化指标
-        self.ref_point = torch.tensor([1.1]*self.dim)
-        if self.problem == 'dtlz7':
-            self.ref_point = torch.tensor([15.]*self.dim)
-        elif self.problem == 'dtlz1':
-            self.ref_point = torch.tensor([400.]*self.dim)
+        self.ref_point = torch.tensor([1+0.00001]*self.dim)
+        # if self.problem == 'dtlz7':
+        #     self.ref_point = torch.tensor([15.]*self.dim)
+        # elif self.problem == 'dtlz1':
+        #     self.ref_point = torch.tensor([400.]*self.dim)
         
         # 获取真实Pareto前沿
         self.truepf = self.problem_instance.pf()
@@ -153,9 +170,11 @@ class EvoXContiEnv(gym.Env):
             reward = current_hv - self.indicator_last
             self.indicator_last = current_hv
         else:
-            current_hv = hv(current_f, self.ref_point)
+            # current_hv = hv(current_f, self.ref_point)
+            optimum = self.truepf.max(dim=0).values
+            current_hv = hv_normalized(current_f, optimum)
             current_igd = igd(current_f, self.truepf)
-            indicator = current_hv + self.w1 * current_igd
+            indicator = current_hv - self.w1 * current_igd
             reward = (indicator - self.indicator_last) / abs(self.indicator_last)
             self.indicator_last = indicator
         if self.reward_mode == 'igdhv':
@@ -172,7 +191,8 @@ class EvoXContiEnv(gym.Env):
 
             elif self.reward_mode == 'log':  # 对数平滑
                 # 权重：log(g+1)/log(max_gen+1)，归一化到[0,1]
-                weight = np.log(self.current_gen + 1) / np.log(self.n_generations + 1)
+                pass
+                # weight = np.log(self.current_gen + 1) / np.log(self.n_generations + 1)
 
             elif self.reward_mode == 'sigmoid':  # Sigmoid函数
                 k = 5.0  # 曲线陡峭度
@@ -190,47 +210,52 @@ class EvoXContiEnv(gym.Env):
             return 0.0
         # 限制奖励范围
         # print(reward.item())
-        reward = np.clip(reward, -0.1, 1)
+        reward = np.clip(reward, -1, 1)
         return reward
 
     def get_observation(self):
-
         front = self.workflow.algorithm.fit
-        self.state = front
-        return self.state
+        obj_ub = torch.tensor(self.problem_instance.obj_ub)
+        self.state = front/obj_ub
+        return self.state.reshape(-1)
 
 
 
 # 示例使用方式（需配合SB3使用）
 if __name__ == '__main__':
+    reg_evox()
     import warnings
     import torch
+    from datetime import datetime
     torch._dynamo.config.cache_size_limit = 512  # 增大缓存限制
     torch._dynamo.config.suppress_errors = True   # 静默处理错误
     warnings.filterwarnings("ignore", category=UserWarning, message="To copy construct from a tensor*")
     warnings.filterwarnings('ignore', category=DeprecationWarning)
-
-    date = '0308'
+    date = datetime.now().strftime('%m%d')
+    date = '0309'
     # reward_mode = 'hv_Percentage'
     # reward_mode = 'ibea'
     # reward_mode = 'igdhv'
     reward_mode = 'log_smooth' # 1.8251, 0.0142, 0.0361, 0.0119, 0.0022, -0.0050, -0.0456, 0.0001, 0.0034, 0.0099, -0.0119, 0.0292, 0.0468, 0.0142, -0.0059, 0.0062, 0.0326, 0.0018, -0.0120, 0.0156, -0.0277, -0.0069, 0.0032, -0.0166, 0.0130, 0.0137
     pop_size = 85
     # problem = 'dtlz2'
-    problem = 'maf2'
+    # problem = 'maf2'
+    problem = 'all'
     dim = 5
-    n_generations = 5000
-    n_steps = 20
+    n_generations = 10000
+    n_steps = 10
     total_timesteps = 4e5
 
     test_step = 2e4
     N_test = int(total_timesteps // test_step)
     # print(to_sci_string(n_generations), to_sci_string(total_timesteps))
 
-    save_path = "ppo_"+ reward_mode[0:4]+"_"+problem+"_d"+str(dim)+"_g"+to_sci_string(n_generations)+"_ns"+str(n_steps)+'_'+to_sci_string(int(total_timesteps))+'_'+date
+    save_path = reward_mode[0:4]+"_"+problem+"_d"+str(dim)+"_g"+to_sci_string(n_generations)+"_ns"+str(n_steps)+'_'+to_sci_string(int(total_timesteps))+'_'+date
 
-    env = EvoXContiEnv(problem, dim,  n_generations=n_generations, pop_size=pop_size, reward_mode =reward_mode)
-    policy_kwargs = dict(net_arch=[dict(pi=[128, 128], vf=[128, 128])])
+    # env = EvoXContiEnv(problem, dim,  n_generations=n_generations, pop_size=pop_size, reward_mode =reward_mode)
+        # 创建环境
+    env = gym.make('env_evox-v1', problem=problem, dim=dim, n_generations=n_generations, pop_size=pop_size, reward_mode=reward_mode)
+    policy_kwargs = dict(net_arch=[dict(pi=[256, 256, 256], vf=[256, 256, 256])])
     model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./mlp_tensorboard/", n_steps=n_steps, policy_kwargs=policy_kwargs) 
     # model = PPO("MlpPolicy", env, verbose=0, tensorboard_log="./mlp_tensorboard/", n_steps=n_steps) 
     # model = PPO.load("/home/zhu_di/workspace/rl_maoea/models/0ppo_log__all_d5_g5e3_ns20_4e5_0308.zip", env=env) 
@@ -241,21 +266,21 @@ if __name__ == '__main__':
     for i in range(N_test):
     # for i in [0,1]:
         # i=0
-        test_step = 200
-        model.learn(total_timesteps=test_step, tb_log_name=str(i+1)+save_path, log_interval=1, reset_num_timesteps=False)
-        model.save("models/"+str(i)+save_path)
-        # vec_env = model.get_env()
+        # test_step = 200
+        model.learn(total_timesteps=test_step, tb_log_name="ppo_"+ str(i+1)+save_path, log_interval=1, reset_num_timesteps=False)
+        model.save("models/"+"ppo_"+ str(i)+save_path)
+        vec_env = model.get_env()
         # # vec_env = RecurrentPPO.load(str(i)+save_path)
         # # print(vec_env.unwrapped.envs[0].rewards)
         # print(i)
-        # avg_hv, std_hv, avg_igd, std_igd = test_evox(vec_env, problem, dim, model, n_generations=n_generations, n_runs=5, reward_mode='igdhv')
-        # print('avg_hv', avg_hv, 'std_hv', std_hv, 'avg_igd', avg_igd, 'std_igd', std_igd)
-        # with open("metric_log/metric_ppo.txt", "a") as file:
-        #     file.write(str(i)+save_path)
-        #     file.write(f"avg_hv: {avg_hv}")
-        #     file.write(f"std_hv: {std_hv}")
-        #     file.write(f"avg_igd: {avg_igd}")
-        #     file.write(f"std_igd: {std_igd}\n")
+        avg_hv, std_hv, avg_igd, std_igd = test_evox(vec_env, problem, dim, model, n_generations=n_generations, n_runs=5, reward_mode=reward_mode)
+        print('avg_hv', avg_hv, 'std_hv', std_hv, 'avg_igd', avg_igd, 'std_igd', std_igd)
+        with open("metric_log/metric_ppo.txt", "a") as file:
+            file.write(str(i)+save_path)
+            file.write(f"avg_hv: {avg_hv}")
+            file.write(f"std_hv: {std_hv}")
+            file.write(f"avg_igd: {avg_igd}")
+            file.write(f"std_igd: {std_igd}\n")
         # if len(avg_hvs) > 0:
         #     if np.abs(avg_hv-avg_hvs[-1])<hv_tolence and np.abs(avg_igd-avg_igds[-1])<igd_tolence:
         #         print('hv and igd converge')

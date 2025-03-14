@@ -14,12 +14,15 @@ torch._dynamo.config.cache_size_limit = 512  # 增大缓存限制
 torch._dynamo.config.suppress_errors = True   # 静默处理错误
 warnings.filterwarnings("ignore", category=UserWarning, message="To copy construct from a tensor*")
 warnings.filterwarnings('ignore', category=DeprecationWarning)
-
-date = '0308'
+from datetime import datetime
+    
+date = datetime.now().strftime('%m%d')
+date = '0311'
 # reward_mode = 'hv_Percentage'
 # reward_mode = 'ibea'
 # reward_mode = 'igdhv'
 reward_mode = 'log_smooth' # 1.8251, 0.0142, 0.0361, 0.0119, 0.0022, -0.0050, -0.0456, 0.0001, 0.0034, 0.0099, -0.0119, 0.0292, 0.0468, 0.0142, -0.0059, 0.0062, 0.0326, 0.0018, -0.0120, 0.0156, -0.0277, -0.0069, 0.0032, -0.0166, 0.0130, 0.0137
+# reward_mode = 'sigmoid'
 pop_size = 85
 problem = 'all'
 dim = 5
@@ -31,25 +34,37 @@ test_step = 2e4
 N_test = int(total_timesteps // test_step)
 # print(to_sci_string(n_generations), to_sci_string(total_timesteps))
 
-save_path = "pj_"+ reward_mode[0:4]+"_"+problem+"_d"+str(dim)+"_g"+to_sci_string(n_generations)+"_ns"+str(n_steps)+'_'+to_sci_string(int(total_timesteps))+'_'+date
+save_path = reward_mode[0:4]+"_"+problem+"_d"+str(dim)+"_g"+to_sci_string(n_generations)+"_ns"+str(n_steps)+'_'+to_sci_string(int(total_timesteps))+'_'+date
 
 env = EvoXContiEnv(problem, dim,  n_generations=n_generations, pop_size=pop_size, reward_mode =reward_mode)
 # policy_kwargs = dict(net_arch=[dict(pi=[128, 128], vf=[128, 128])])
 # model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./mlp_tensorboard/", n_steps=n_steps, policy_kwargs=policy_kwargs) 
 # model = PPO("MlpPolicy", env, verbose=0, tensorboard_log="./mlp_tensorboard/", n_steps=n_steps) 
 # model = RecurrentPPO("MlpLstmPolicy", env, verbose=1, tensorboard_log="./mlp_tensorboard/", n_steps=n_steps)
-model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./mlp_tensorboard/", n_steps=n_steps)
+# policy_kwargs = dict(net_arch=[dict(pi=[256, 256, 256], vf=[256, 256, 256])])
+
+# Option 1: Define separate policy and value networks
+policy_kwargs = dict(net_arch=dict(pi=[256, 256, 256], vf=[256, 256, 256]))
+
+# Option 2: Define a shared network followed by separate heads
+# policy_kwargs = dict(net_arch=[64, 64, dict(pi=[256, 256], vf=[256, 256])])
+# The key change is removing the outer list and dict() wrapper around the network architecture. 
+# The SBX implementation expects the network architecture to be defined differently than in Stable Baselines3.
+
+
+# model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./mlp_tensorboard/", n_steps=n_steps, policy_kwargs=policy_kwargs)
+model = PPO.load("/home/zhu_di/workspace/rl_maoea/models/pj_2log__all_d5_g5e3_ns20_4e5_0310.zip", env)
 
 avg_hvs =[]
 avg_igds = []
 hv_tolence = 0.003
 igd_tolence = 0.003
-for i in range(N_test):
+for i in range(3, N_test):
 # for i in [0,1]:
     # i=0
     # test_step = 200
-    model.learn(total_timesteps=test_step, tb_log_name=str(i)+save_path, log_interval=1, reset_num_timesteps=False)
-    model.save("models/"+str(i)+save_path)
+    model.learn(total_timesteps=test_step, tb_log_name="pj_"+ str(i)+save_path, log_interval=1, reset_num_timesteps=False)
+    model.save("models/"+"pj_"+ str(i)+save_path)
     vec_env = model.get_env()
     # vec_env = RecurrentPPO.load("models/"+str(i)+save_path)
     # todo: write test_contrib for RecurrentPPO

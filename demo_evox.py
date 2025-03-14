@@ -3,11 +3,12 @@ import time
 
 import torch
 
-from evox.algorithms import PSO, RVEA
+from evox.algorithms import PSO, RVEA, MOEAD
 # from rvea_evox import RVEA
 from evox.problems.numerical import Ackley, DTLZ2
 from evox.workflows import EvalMonitor, StdWorkflow
 from evox.metrics import hv, igd
+from hv_norm import hv_normalized
 
 def filter_nan_rows(pop_f: torch.Tensor) -> torch.Tensor:
     """
@@ -29,16 +30,24 @@ dim=5
 k=5
 pop_size = 85
 max_gen=5000
+# max_gen = 50000
 d = dim + k - 1
 ref = torch.tensor([1.1]*dim)
 problem = DTLZ2(d=d,m=dim)
 # problem = DTLZ2()
-algorithm = RVEA(
+# algorithm = RVEA(
+#     pop_size=pop_size,
+#     n_objs = dim,
+#     lb=torch.tensor([0]*d),
+#     ub=torch.tensor([1]*d),
+#     max_gen=max_gen,
+# )
+algorithm = MOEAD(
     pop_size=pop_size,
     n_objs = dim,
     lb=torch.tensor([0]*d),
     ub=torch.tensor([1]*d),
-    max_gen=max_gen,
+    # max_gen=max_gen,
 )
 
 # Initiate a problem
@@ -65,7 +74,9 @@ for i in range(max_gen//pop_size):
         pop = workflow.algorithm.pop
         pop_f = workflow.algorithm.fit
         pop_f = filter_nan_rows(pop_f)
-        hv_metric = hv(pop_f, ref)
+        optimum = workflow.problem.pf().max(dim=0).values
+        final_hv = hv_normalized(pop_f, optimum)
+        # hv_metric = hv(pop_f, ref)
         final_igd = igd(pop_f, workflow.problem.pf())
-        print('hv',hv_metric, 'igd', final_igd, 'time', run_time)
+        print('hv',final_hv, 'igd', final_igd, 'time', run_time)
         

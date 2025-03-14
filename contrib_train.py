@@ -20,7 +20,7 @@ date = '0308'
 # reward_mode = 'igdhv'
 reward_mode = 'log_smooth' # 1.8251, 0.0142, 0.0361, 0.0119, 0.0022, -0.0050, -0.0456, 0.0001, 0.0034, 0.0099, -0.0119, 0.0292, 0.0468, 0.0142, -0.0059, 0.0062, 0.0326, 0.0018, -0.0120, 0.0156, -0.0277, -0.0069, 0.0032, -0.0166, 0.0130, 0.0137
 pop_size = 85
-problem = 'alls'
+problem = 'all'
 dim = 5
 n_generations = 5000
 n_steps = 20
@@ -55,7 +55,7 @@ for i in range(N_test):
     
     # print(vec_env.unwrapped.envs[0].rewards)
     # print(i)
-    # avg_hv, std_hv, avg_igd, std_igd = test_evox(vec_env, problem, dim, model, n_generations=n_generations, n_runs=5, reward_mode='igdhv')
+    # avg_hv, std_hv, avg_igd, std_igd = test_evox(vec_env, problem, dim, model, n_generations=n_generations, n_runs=5, reward_mode=reward_mode)
     # print('avg_hv', avg_hv, 'std_hv', std_hv, 'avg_igd', avg_igd, 'std_igd', std_igd)
     # with open("metric_log/metric_pr.txt", "a") as file:
     #     file.write(str(i)+save_path)
